@@ -47,6 +47,59 @@ return function(lib)
 	lib.NavMeshItemParamNameNumPairSeparator = "="
 	lib.NavMeshLinkNodesSeparator = "-"
 
+	lib.NodeBlocking = {
+		mins = Vector(-1, -1, -1),
+		maxs = Vector(1, 1, 1),
+		classes = { func_breakable = true, prop_physics = true, prop_dynamic = true, prop_door_rotating = true, func_door = true, func_physbox = true, func_physbox_multiplayer = true, func_movelinear = true }
+	}
+	lib.NodeBlockingMap = {
+		mins = Vector(-1, -1, -1),
+		maxs = Vector(1, 1, 1),
+		classes = { func_breakable = true, prop_dynamic = true, prop_door_rotating = true, func_door = true, func_movelinear = true }
+	}
+
+	---@param nodeParams table
+	---@param nodePos Vector
+	---@param wave number
+	---@return boolean
+	function lib.IsNavMeshNodeBlocked(nodeParams, nodePos, wave)
+		local blocked = false
+
+		if nodeParams.Condition == "Unblocked" or nodeParams.Condition == "Blocked" then
+			local ents = ents.FindInBox(nodePos + lib.NodeBlocking.mins, nodePos + lib.NodeBlocking.maxs)
+			for _, ent in ipairs(ents) do
+				if lib.NodeBlocking.classes[ent:GetClass()] then blocked = true; break end
+			end
+			if nodeParams.Condition == "Blocked" then blocked = not blocked end
+		elseif nodeParams.Condition == "MapUnblocked" then
+			local ents = ents.FindInBox(nodePos + lib.NodeBlockingMap.mins, nodePos + lib.NodeBlockingMap.maxs)
+			for _, ent in ipairs(ents) do
+				if lib.NodeBlockingMap.classes[ent:GetClass()] then blocked = true; break end
+			end
+		end
+
+		if not blocked and nodeParams.BlockEntity then
+			local blockRadius = tonumber(nodeParams.BlockRadius)
+			if blockRadius then
+				for _, ent in ipairs(ents.FindInSphere(nodePos, blockRadius)) do
+					if ent:GetClass() == nodeParams.BlockEntity then
+						blocked = true
+						break
+					end
+				end
+			end
+		end
+
+		if nodeParams.BlockBeforeWave and tonumber(nodeParams.BlockBeforeWave) then
+			if wave < tonumber(nodeParams.BlockBeforeWave) then blocked = true end
+		end
+		if nodeParams.BlockAfterWave and tonumber(nodeParams.BlockAfterWave) then
+			if wave > tonumber(nodeParams.BlockAfterWave) then blocked = true end
+		end
+
+		return blocked
+	end
+
 	lib.Params = {
 		Correct = {
 			Jump = { "Disabled", "Always" },
@@ -59,6 +112,8 @@ return function(lib)
 			AimTo = { "Straight" },
 			Cost = {},
 			Condition = { "Unblocked", "Blocked", "MapUnblocked" },
+			BlockEntity = {},
+			BlockRadius = {},
 			BlockBeforeWave = {},
 			BlockAfterWave = {},
 			Direction = { "Forward", "Backward" },

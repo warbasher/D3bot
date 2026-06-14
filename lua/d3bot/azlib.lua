@@ -185,6 +185,7 @@ return function(globalK, otherLibFilesRelPathEach)
 	lib.Color.Orange = Color(255, 128, 0)
 	lib.Color.Yellow = Color(255, 255, 0)
 	lib.Color.Green = Color(0, 150, 0)
+	lib.Color.Blocked = Color(160, 0, 255)
 	for name, color in pairs(lib.Color) do
 		color.HalfAlpha = ColorAlpha(color, 128)
 		color.EightAlpha = ColorAlpha(color, 32)

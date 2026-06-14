@@ -59,28 +59,7 @@ function D3bot.GetBestMeshPathOrNil(startNode, endNode, pathCostFunction, heuris
 				link.CachedZDiff = linkZDiff -- The cache will be invalidated on any navmesh change.
 			end
 
-			local blocked = false
-			if linkedNodeParams.Condition == "Unblocked" or linkedNodeParams.Condition == "Blocked" then
-				local ents = ents.FindInBox(linkedNode.Pos + D3bot.NodeBlocking.mins, linkedNode.Pos + D3bot.NodeBlocking.maxs)
-				for _, ent in ipairs(ents) do
-					if D3bot.NodeBlocking.classes[ent:GetClass()] then blocked = true; break end
-				end
-				if linkedNodeParams.Condition == "Blocked" then blocked = not blocked end
-			elseif linkedNodeParams.Condition == "MapUnblocked" then
-				local ents = ents.FindInBox(linkedNode.Pos + D3bot.NodeBlockingMap.mins, linkedNode.Pos + D3bot.NodeBlockingMap.maxs)
-				for _, ent in ipairs(ents) do
-					if D3bot.NodeBlockingMap.classes[ent:GetClass()] then blocked = true; break end
-				end
-			end
-
-			-- Block pathing if the wave is outside of the interval [BlockBeforeWave, BlockAfterWave].
-			if linkedNodeParams.BlockBeforeWave and tonumber(linkedNodeParams.BlockBeforeWave) then
-				if wave < tonumber(linkedNodeParams.BlockBeforeWave) then blocked = true end
-			end
-			if linkedNodeParams.BlockAfterWave and tonumber(linkedNodeParams.BlockAfterWave) then
-				if wave > tonumber(linkedNodeParams.BlockAfterWave) then blocked = true end
-				-- TODO: Invert logic when BlockBeforeWave > BlockAfterWave. This way it's possible to describe a interval of blocked waves, instead of unblocked waves
-			end
+			local blocked = D3bot.IsNavMeshNodeBlocked(linkedNodeParams, linkedNode.Pos, wave)
 
 			-- Check how we traverse the current link. It's forwards if we go from link.Nodes[1] to link.Nodes[2].
 			local forwards = link.Nodes[1] == node
@@ -212,25 +191,9 @@ function D3bot.GetEscapeMeshPathOrNil(startNode, iterations, pathCostFunction, h
 		end
 		
 		for linkedNode, link in pairs(node.LinkByLinkedNode) do
-			
-			local blocked = false
-			if linkedNode.Params.Condition == "Unblocked" or linkedNode.Params.Condition == "Blocked" then
-				local ents = ents.FindInBox(linkedNode.Pos + D3bot.NodeBlocking.mins, linkedNode.Pos + D3bot.NodeBlocking.maxs)
-				for _, ent in ipairs(ents) do
-					if D3bot.NodeBlocking.classes[ent:GetClass()] then blocked = true; break end
-				end
-				if linkedNode.Params.Condition == "Blocked" then blocked = not blocked end
-			end
 
-			-- Block pathing if the wave is outside of the interval [BlockBeforeWave, BlockAfterWave]
-			if linkedNode.Params.BlockBeforeWave and tonumber(linkedNode.Params.BlockBeforeWave) then
-				if GAMEMODE:GetWave() < tonumber(linkedNode.Params.BlockBeforeWave) then blocked = true end
-			end
-			if linkedNode.Params.BlockAfterWave and tonumber(linkedNode.Params.BlockAfterWave) then
-				if GAMEMODE:GetWave() > tonumber(linkedNode.Params.BlockAfterWave) then blocked = true end
-				-- TODO: Invert logic when BlockBeforeWave > BlockAfterWave. This way it's possible to describe a interval of blocked waves, instead of unblocked waves
-			end
-			
+			local blocked = D3bot.IsNavMeshNodeBlocked(linkedNode.Params, linkedNode.Pos, GAMEMODE:GetWave())
+
 			local able = true
 			if link.Params.Walking == "Needed" and abilities and not abilities.Walk then able = false end
 			if link.Params.Pouncing == "Needed" and abilities and not abilities.Pounce then able = false end

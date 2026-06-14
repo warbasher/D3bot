@@ -25,14 +25,64 @@ return function(lib)
 	local selectedNodeIDs = {} -- Contains the same information as `isHighlightedById`, but is sorted by selection order.
 	function lib.HighlightInMapNavMeshView(id) isHighlightedById[id] = true table.insert(selectedNodeIDs, id) end
 	function lib.ClearMapNavMeshViewHighlights() isHighlightedById, selectedNodeIDs = {}, {} end
-	
-	local function getItemColor(item) return lib.Color[isHighlightedById[item.Id] and "Green" or (item == cursoredItemOrNil and "Orange" or (isPathPieceById[item.Id] and "Yellow" or "Red"))] end
-	local function getOutlineColor(item) return lib.Color[isHighlightedById[item.Id] and "Green" or (item == cursoredItemOrNil and "Orange" or "Black")] end
-	
+
 	local isHiddenParamByParamName = from((" "):Explode("X Y Z AreaXMin AreaYMin AreaXMax AreaYMax")):VsSet().R
-	
+
 	local nodeVisualProperties = {}
 	local nodeVisualPropertiesQueue = {}
+
+	local blockedNodeById = {}
+	local blockedNodeUpdateQueue = {}
+
+	function lib.InvalidateMapNavMeshViewBlockedCache()
+		blockedNodeById = {}
+		blockedNodeUpdateQueue = {}
+	end
+
+	local function getPathfindingWave()
+		return (GAMEMODE and GAMEMODE.GetWave and GAMEMODE:GetWave()) or 0
+	end
+
+	local function updateBlockedNodeCache(batchSize)
+		if not lib.MapNavMesh or not lib.MapNavMesh.NodeById then return end
+		if #blockedNodeUpdateQueue == 0 then
+			for id in pairs(lib.MapNavMesh.NodeById) do
+				table.insert(blockedNodeUpdateQueue, id)
+			end
+		end
+		local wave = getPathfindingWave()
+		for i = 1, batchSize do
+			local id = table.remove(blockedNodeUpdateQueue, 1)
+			if not id then break end
+			local node = lib.MapNavMesh.NodeById[id]
+			blockedNodeById[id] = node and lib.IsNavMeshNodeBlocked(node.Params, node.Pos, wave) or false
+			table.insert(blockedNodeUpdateQueue, id)
+		end
+	end
+
+	local function isItemPathBlocked(item)
+		if item.Type == "node" then
+			return blockedNodeById[item.Id] == true
+		end
+		if item.Type == "link" then
+			local nodeA, nodeB = unpack(item.Nodes)
+			return blockedNodeById[nodeA.Id] or blockedNodeById[nodeB.Id]
+		end
+	end
+
+	local function getItemColor(item)
+		if isHighlightedById[item.Id] then return lib.Color.Green end
+		if item == cursoredItemOrNil then return lib.Color.Orange end
+		if isPathPieceById[item.Id] then return lib.Color.Yellow end
+		if isItemPathBlocked(item) then return lib.Color.Blocked end
+		return lib.Color.Red
+	end
+	local function getOutlineColor(item)
+		if isHighlightedById[item.Id] then return lib.Color.Green end
+		if item == cursoredItemOrNil then return lib.Color.Orange end
+		if isItemPathBlocked(item) then return lib.Color.Blocked end
+		return lib.Color.Black
+	end
 	
 	local function isNodeIdHighlightedOrSelected(id) return isHighlightedById[id] or (cursoredItemOrNil and cursoredItemOrNil.Id == id) end
 	local function isNodeIdVisible(id) return isNodeIdHighlightedOrSelected(id) or nodeVisualProperties[id] and not nodeVisualProperties[id].ShouldHide end
@@ -75,8 +125,10 @@ return function(lib)
 		isEnabled = bool
 		if isEnabled then
 			nodeVisualProperties = {}
+			lib.InvalidateMapNavMeshViewBlockedCache()
 			hook.Add("Think", hooksId, function()
 				cursoredItemOrNil = lib.MapNavMesh:GetCursoredItemOrNil(LocalPlayer())
+				updateBlockedNodeCache(20)
 				
 				local smartDraw = D3bot.Convar_Navmeshing_SmartDraw:GetBool()
 				if smartDraw then
@@ -155,6 +207,10 @@ return function(lib)
 								end
 							end
 							render.DrawSphere(node.Pos, 2, 8, 8, getItemColor(node))
+							local blockRadius = tonumber(node.Params.BlockRadius)
+							if blockRadius and node.Params.BlockEntity and blockedNodeById[id] then
+								render.DrawWireframeSphere(node.Pos, blockRadius, 12, 12, lib.Color.Blocked.HalfAlpha, true)
+							end
 						end
 						if smartDraw and isNodeIdHighlightedOrSelected(id) then
 							cam.IgnoreZ(false)
@@ -448,6 +504,9 @@ return function(lib)
 							local paramsQuery = from(item.Params)
 							if not isCursored then paramsQuery:Where(function(name) return not isHiddenParamByParamName[name] end) end
 							local txt = item.Id .. ":\n" .. paramsQuery:Sel(function(name, v) return nil, name .. " = " .. v end):Sort():Join("\n").R
+							if item.Type == "node" and blockedNodeById[item.Id] then
+								txt = txt .. "\n[BLOCKED]"
+							end
 							local txtW, txtH = surface.GetTextSize(txt)
 							local w = txtW + 10
 							local h = txtH + 10
@@ -466,6 +525,7 @@ return function(lib)
 				end
 			end)
 		else
+			lib.InvalidateMapNavMeshViewBlockedCache()
 			hook.Remove("Think", hooksId)
 			hook.Remove("PostDrawOpaqueRenderables", hooksId)
 			hook.Remove("HUDPaint", hooksId)

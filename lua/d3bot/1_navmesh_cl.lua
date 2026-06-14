@@ -11,6 +11,7 @@ return function(lib)
 		if finished then
 			lib.MapNavMesh = lib.DeserializeNavMesh(util.Decompress(buffer)) or {}
 			buffer = ""
+			if lib.InvalidateMapNavMeshViewBlockedCache then lib.InvalidateMapNavMeshViewBlockedCache() end
 		end
 	end)
 end
