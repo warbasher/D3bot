@@ -208,8 +208,8 @@ return function(lib)
 							end
 							render.DrawSphere(node.Pos, 2, 8, 8, getItemColor(node))
 							local blockRadius = tonumber(node.Params.BlockRadius)
-							if blockRadius and node.Params.BlockEntity and blockedNodeById[id] then
-								render.DrawWireframeSphere(node.Pos, blockRadius, 12, 12, lib.Color.Blocked.HalfAlpha, true)
+							if blockRadius and node.Params.BlockEntity then
+								render.DrawWireframeSphere(node.Pos, blockRadius, 12, 12, blockedNodeById[id] and lib.Color.Blocked or lib.Color.Blocked.HalfAlpha, true)
 							end
 						end
 						if smartDraw and isNodeIdHighlightedOrSelected(id) then
