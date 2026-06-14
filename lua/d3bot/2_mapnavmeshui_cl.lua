@@ -55,7 +55,7 @@ return function(lib)
 			local id = table.remove(blockedNodeUpdateQueue, 1)
 			if not id then break end
 			local node = lib.MapNavMesh.NodeById[id]
-			blockedNodeById[id] = node and lib.IsNavMeshNodeBlocked(node.Params, node.Pos, wave) or false
+			blockedNodeById[id] = node and D3bot.IsNavMeshNodeBlocked(node.Params, node.Pos, wave) or false
 			table.insert(blockedNodeUpdateQueue, id)
 		end
 	end

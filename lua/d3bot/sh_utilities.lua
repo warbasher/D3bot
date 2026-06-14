@@ -91,6 +91,52 @@ function D3bot.RemoveObsDeadTgts(tgts)
 	return D3bot.From(tgts):Where(function(k, v) return IsValid(v) and v:GetObserverMode() == OBS_MODE_NONE and not v:IsFlagSet(FL_NOTARGET) and v:Alive() end).R
 end
 
+---@param nodeParams table
+---@param nodePos Vector
+---@param wave number
+---@return boolean
+function D3bot.IsNavMeshNodeBlocked(nodeParams, nodePos, wave)
+	local nodeBlocking = D3bot.NodeBlocking
+	local nodeBlockingMap = D3bot.NodeBlockingMap
+	if not nodeBlocking or not nodeBlockingMap then return false end
+
+	local blocked = false
+
+	if nodeParams.Condition == "Unblocked" or nodeParams.Condition == "Blocked" then
+		local ents = ents.FindInBox(nodePos + nodeBlocking.mins, nodePos + nodeBlocking.maxs)
+		for _, ent in ipairs(ents) do
+			if nodeBlocking.classes[ent:GetClass()] then blocked = true; break end
+		end
+		if nodeParams.Condition == "Blocked" then blocked = not blocked end
+	elseif nodeParams.Condition == "MapUnblocked" then
+		local ents = ents.FindInBox(nodePos + nodeBlockingMap.mins, nodePos + nodeBlockingMap.maxs)
+		for _, ent in ipairs(ents) do
+			if nodeBlockingMap.classes[ent:GetClass()] then blocked = true; break end
+		end
+	end
+
+	if not blocked and nodeParams.BlockEntity then
+		local blockRadius = tonumber(nodeParams.BlockRadius)
+		if blockRadius then
+			for _, ent in ipairs(ents.FindInSphere(nodePos, blockRadius)) do
+				if ent:GetClass() == nodeParams.BlockEntity then
+					blocked = true
+					break
+				end
+			end
+		end
+	end
+
+	if nodeParams.BlockBeforeWave and tonumber(nodeParams.BlockBeforeWave) then
+		if wave < tonumber(nodeParams.BlockBeforeWave) then blocked = true end
+	end
+	if nodeParams.BlockAfterWave and tonumber(nodeParams.BlockAfterWave) then
+		if wave > tonumber(nodeParams.BlockAfterWave) then blocked = true end
+	end
+
+	return blocked
+end
+
 ---Calculates a falloff on the given nodes.
 ---@param startNode D3NavmeshNode|nil -- The node to start on.
 ---@param iterations integer -- The maximum number of iterations.
