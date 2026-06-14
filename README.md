@@ -162,6 +162,8 @@ Be sure to follow all the other necessary steps as described in [#Installation](
     - Condition = Unblocked: Bots will only use this node for pathfinding if there is no entity within a range of one source unit. Detected entities are func_breakable, prop_physics, prop_dynamic, prop_door_rotating, func_door, func_physbox_multiplayer, func_movelinear.
     - Condition = Blocked: Opposite of Unblocked. Use this on breakable pathways.
     - Condition = MapUnblocked: Same as Unblocked, but it excludes objects that could potentially be used in cades.
+	- BlockEntity = Entity types that should disable this node.
+	- BlockRadius = Proximity to node for blocking to occur.
     - BlockBeforeWave: Bots will not use this node for pathfinding until the current wave is greater than or equal to the given value.
     - BlockAfterWave: Bots will not use this node for pathfinding if the current wave is greater than the given value.
     - DMGPerSecond: Apply damage to human players and entities located on this node. Can be disabled globally in `sv_config.lua` by setting `D3bot.DisableNodeDamage = true`.
