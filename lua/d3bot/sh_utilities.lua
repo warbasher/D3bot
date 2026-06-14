@@ -117,41 +117,44 @@ function D3bot.IsNavMeshNodeBlocked(nodeParams, nodePos, wave)
 	local nodeBlockingMap = D3bot.NodeBlockingMap
 	if not nodeBlocking or not nodeBlockingMap then return false end
 
-	local blocked = false
-
-	if nodeParams.Condition == "Unblocked" or nodeParams.Condition == "Blocked" then
+	if nodeParams.Condition == "Unblocked" then
 		local ents = ents.FindInBox(nodePos + nodeBlocking.mins, nodePos + nodeBlocking.maxs)
 		for _, ent in ipairs(ents) do
-			if nodeBlocking.classes[ent:GetClass()] then blocked = true; break end
+			if nodeBlocking.classes[ent:GetClass()] then return true end
 		end
-		if nodeParams.Condition == "Blocked" then blocked = not blocked end
+	elseif nodeParams.Condition == "Blocked" then
+		local ents = ents.FindInBox(nodePos + nodeBlocking.mins, nodePos + nodeBlocking.maxs)
+		local found = false
+		for _, ent in ipairs(ents) do
+			if nodeBlocking.classes[ent:GetClass()] then found = true; break end
+		end
+		if not found then return true end
 	elseif nodeParams.Condition == "MapUnblocked" then
 		local ents = ents.FindInBox(nodePos + nodeBlockingMap.mins, nodePos + nodeBlockingMap.maxs)
 		for _, ent in ipairs(ents) do
-			if nodeBlockingMap.classes[ent:GetClass()] then blocked = true; break end
+			if nodeBlockingMap.classes[ent:GetClass()] then return true end
 		end
 	end
 
-	if not blocked and nodeParams.BlockEntity then
+	if nodeParams.BlockEntity then
 		local blockRadius = tonumber(nodeParams.BlockRadius)
 		if blockRadius then
 			for _, ent in ipairs(ents.FindInSphere(nodePos, blockRadius)) do
 				if ent:GetClass() == nodeParams.BlockEntity then
-					blocked = true
-					break
+					return true
 				end
 			end
 		end
 	end
 
 	if nodeParams.BlockBeforeWave and tonumber(nodeParams.BlockBeforeWave) then
-		if wave < tonumber(nodeParams.BlockBeforeWave) then blocked = true end
+		if wave < tonumber(nodeParams.BlockBeforeWave) then return true end
 	end
 	if nodeParams.BlockAfterWave and tonumber(nodeParams.BlockAfterWave) then
-		if wave > tonumber(nodeParams.BlockAfterWave) then blocked = true end
+		if wave > tonumber(nodeParams.BlockAfterWave) then return true end
 	end
 
-	return blocked
+	return false
 end
 
 ---Calculates a falloff on the given nodes.
