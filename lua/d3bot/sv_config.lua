@@ -4,13 +4,16 @@ D3bot.BotSeeTr = {
 	mask = MASK_PLAYERSOLID
 }
 
-D3bot.ValveNav = true						-- Enable the use of auto-generated nav-meshes ("SourceNav"). You can create these by using the console command "nav_generate".
-D3bot.ValveNavOverride = false				-- When true: Prefer auto-generated nav-meshes ("SourceNav") over manually created nav-meshes ("D3botNav").
+D3bot.ValveNav = true		-- Enable the use of auto-generated nav-meshes ("SourceNav"). You can create these by using the console command "nav_generate".
+D3bot.ValveNavOverride = false	-- When true: Prefer auto-generated nav-meshes ("SourceNav") over manually created nav-meshes ("D3botNav").
 
 D3bot.NodeDamageEnts = {"prop_*turret", "prop_arsenalcrate", "prop_resupply"}
 
 D3bot.LinkDeathCostRaise = 300
-D3bot.BotConsideringDeathCostAntichance = 3
+--D3bot.BotConsideringDeathCostAntichance = 3
+-- Bots will consider other paths at this chance math.random(1, value)
+D3bot.BotConsideringDeathCostAntichance = 20
+
 D3bot.BotAngLerpFactor = 0.125					-- Linear interpolation factor between the current viewing angle and target viewing angle.
 D3bot.BotAttackAngLerpFactor = 0.125--0.5		-- See above, but for attacking.
 D3bot.BotAimAngLerpFactor = 0.5					-- See above, but for aiming with guns.
@@ -38,8 +41,7 @@ D3bot.StartBonus = nil					-- Number of additional points, that players get at t
 D3bot.DisableBotCrows = false			-- Disable crows from being controlled by the bot.
 
 -- Uncomment the name file you want to use. If you comment out all of the name files, standard names will be used. (Bot, Bot(2), Bot(3), ...)
-D3bot.BotNameFile = "fng_usernames"
---D3bot.BotNameFile = "bottish"
+D3bot.BotNameFile = "names"
 
 D3bot.UseConsoleBots = false			-- If true, bots will be spawned "the old way". But this will disable custom names.
 										-- This may help if the gamemode doesn't fully support the new bot spawning.

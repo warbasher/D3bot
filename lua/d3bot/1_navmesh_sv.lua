@@ -63,5 +63,20 @@ return function(lib)
 		end)
 		lib.MapNavMesh = mapNavMesh
 	end
+	function lib.LoadMapNavMeshCustom(fileName)
+		local mapNavMesh
+		lib.TryCatch(function()
+			mapNavMesh = lib.DeserializeNavMesh(file.Read(lib.MapNavMeshDir..fileName..".txt", "DATA") or "")
+		end, function(errorMsg)
+			mapNavMesh = lib.NewNavMesh()
+			lib.LogError("Couldn't load " .. lib.MapNavMeshDir..fileName .. " (using empty nav mesh instead):\n" .. errorMsg)
+		end)
+		lib.TryCatch(function()
+			mapNavMesh:DeserializeNavMeshParams(file.Read(lib.MapNavMeshDir..fileName..".params.txt", "DATA") or "")
+		end, function(errorMsg)
+			lib.LogError("Couldn't load params for " .. lib.MapNavMeshDir..fileName .. ":\n" .. errorMsg)
+		end)
+		lib.MapNavMesh = mapNavMesh
+	end
 	lib.LoadMapNavMesh()
 end

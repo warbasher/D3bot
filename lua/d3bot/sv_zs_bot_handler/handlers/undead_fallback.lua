@@ -5,16 +5,34 @@ HANDLER.AngOffshoot = 45
 HANDLER.BotTgtFixationDistMin = 250
 HANDLER.BotClasses = {
 	"Zombie", "Zombie", "Zombie",
-	"Ghoul",
-	"Wraith", "Wraith", "Wraith",
-	"Bloated Zombie", "Bloated Zombie", "Bloated Zombie",
-	"Fast Zombie", "Fast Zombie", "Fast Zombie", "Fast Zombie",
+	"Brood Zombie", "Brood Zombie", "Brood Zombie",
+	--"Wraith",
+	"Ghoul", "Ghoul",
+	"Fast Zombie", "Fast Zombie", "Fast Zombie",
+	"Lacerator", "Lacerator",
 	"Poison Zombie", "Poison Zombie", "Poison Zombie",
-	"Zombine", "Zombine", "Zombine", "Zombine", "Zombine"
+	--"Shadowlurker",
+	"Gore Blaster", "Gore Blaster",
+	"Vile Gore Blaster", "Vile Gore Blaster",
+	"Elder Ghoul", "Elder Ghoul",
+	"Frigid Ghoul", "Frigid Ghoul",
+	"Shadow Lurker", "Shadow Lurker",
+	"Abyss Lurker", "Abyss Lurker",
+	"Chem Breacher", "Chem Breacher", "Chem Breacher",
+	"Nightmare", "Nightmare", "Nightmare",
+}
+HANDLER.BotClassesPandemic = {
+	"Fresh Dead", "Leaper"
 }
 HANDLER.RandomSecondaryAttack = {
-	Ghoul = {MinTime = 5, MaxTime = 7}
-	--["Poison Zombie"] = {MinTime = 5, MaxTime = 7} -- Slows them too much
+	["Ghoul"] = {MinTime = 5, MaxTime = 7},
+	["Frigid Ghoul"] = {MinTime = 5, MaxTime = 7},
+	["Elder Ghoul"] = {MinTime = 5, MaxTime = 7},
+	["Gore Blaster"] = {MinTime = 5, MaxTime = 7},
+	["Vile Gore Blaster"] = {MinTime = 5, MaxTime = 7},
+	["Poison Zombie"] = {MinTime = 5, MaxTime = 7},
+	["Wild Poison Zombie"] = {MinTime = 5, MaxTime = 7},
+	["Abyss Lurker"] = {MinTime = 5, MaxTime = 7}
 }
 
 HANDLER.Fallback = true
@@ -181,7 +199,11 @@ end
 ---@param bot GPlayer
 function HANDLER.OnDeathFunction(bot)
 	--bot:Say("rip me!")
-	bot:D3bot_RerollClass(HANDLER.BotClasses) -- TODO: Situation depending reroll of the zombie class
+	if GAMEMODE:IsPandemicMode() then
+		bot:D3bot_RerollClass(HANDLER.BotClassesPandemic)
+	else
+		bot:D3bot_RerollClass(HANDLER.BotClasses) -- TODO: Situation depending reroll of the zombie class
+	end
 	HANDLER.RerollTarget(bot)
 end
 
@@ -189,7 +211,8 @@ end
 -- Custom functions and settings --
 -----------------------------------
 
-local potTargetEntClasses = {"prop_*turret", "prop_arsenalcrate", "prop_manhack*", "prop_obj_sigil"}
+local potTargetEntClasses = {"prop_arsenalcrate", "prop_manhack*", "prop_obj_sigil"}
+local ignoreDamageFrom = {["prop_gunturret"] = true}
 local potEntTargets = nil
 
 ---Returns whether a target is valid.
@@ -209,14 +232,17 @@ end
 function HANDLER.RerollTarget(bot)
 	-- Get humans or non zombie players or any players in this order.
 	local players = D3bot.RemoveObsDeadTgts(team.GetPlayers(TEAM_HUMAN))
-	if #players == 0 and TEAM_UNDEAD then
+	if (#players == 0) and TEAM_UNDEAD then
 		players = D3bot.RemoveObsDeadTgts(player.GetAll())
 		players = D3bot.From(players):Where(function(k, v) return v:Team() ~= TEAM_UNDEAD end).R
 	end
-	if #players == 0 then
+
+	if (#players == 0) then
 		players = D3bot.RemoveObsDeadTgts(player.GetAll())
 	end
+
 	potEntTargets = D3bot.GetEntsOfClss(potTargetEntClasses)
+
 	local potTargets = table.Add(players, potEntTargets)
 	bot:D3bot_SetTgtOrNil(table.Random(potTargets), false, nil)
 end

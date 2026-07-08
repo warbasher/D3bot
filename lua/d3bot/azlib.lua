@@ -17,23 +17,96 @@ return function(globalK, otherLibFilesRelPathEach)
 	
 	function lib.WriteOrAdd(tbl, k, v) if k == nil then table.insert(tbl, v) else tbl[k] = v end end
 	
+	-- PERFORMANCE NOTE: this used to be a plain sorted array. Enqueue() did a linear scan to
+	-- find the insertion point, then table.insert() at that index, which shifts every
+	-- element after it -- O(n) per insert, and this is the priority queue that
+	-- D3bot.GetBestMeshPathOrNil() (A* pathfinding) uses for every single node it evaluates.
+	-- The file's own benchmark comments show multi-millisecond costs per full path search
+	-- even before accounting for this; on navmeshes with a lot of nodes this queue was very
+	-- likely the single biggest contributor. Replaced with a standard binary min-heap:
+	-- O(log n) for both Enqueue and Dequeue. External API (Enqueue/Dequeue, dedup via .Set,
+	-- and the `func(a, b)` comparator signature) is unchanged, so callers (sv_path.lua)
+	-- don't need to change at all.
+	--
+	-- Comparator semantics are preserved exactly from the old implementation: func(a, b)
+	-- returning true means "a is lower priority than b" (a should be dequeued *after* b).
+	-- Dequeue() always returns the highest-priority (lowest-cost, in the pathfinding case)
+	-- remaining item.
 	lib.SortedQueueMeta = { __index = {} }
 	local sortedQueueFallback = lib.SortedQueueMeta.__index
+
 	function lib.NewSortedQueue(func)
 		return setmetatable({
-			Set = {},
-			Func = func }, lib.SortedQueueMeta)
+			Set = {},   -- item -> true, for O(1) dedup checks on Enqueue.
+			Func = func,
+			Heap = {},  -- 1-indexed binary heap array.
+			Size = 0 }, lib.SortedQueueMeta)
 	end
+
+	-- Returns true if the item at heap index a has strictly higher priority (should be
+	-- dequeued before) the item at heap index b. This is func(b, a) rather than func(a, b):
+	-- func(worse, better) == true in the original semantics, so "a has higher priority than
+	-- b" is exactly "b is lower priority than a" == func(b, a).
+	local function heapHigherPriority(self, indexA, indexB)
+		return self.Func(self.Heap[indexB], self.Heap[indexA])
+	end
+
+	local function heapSwap(self, i, j)
+		self.Heap[i], self.Heap[j] = self.Heap[j], self.Heap[i]
+	end
+
+	-- Restores the heap property by moving the item at index i up towards the root, as long
+	-- as it has higher priority than its parent. Called after inserting a new item at the end.
+	local function siftUp(self, i)
+		while i > 1 do
+			local parent = math.floor(i / 2)
+			if heapHigherPriority(self, i, parent) then
+				heapSwap(self, i, parent)
+				i = parent
+			else
+				break
+			end
+		end
+	end
+
+	-- Restores the heap property by moving the item at index i down towards the leaves, as
+	-- long as one of its children has higher priority. Called after moving the last item to
+	-- the root position (which happens on every Dequeue).
+	local function siftDown(self, i)
+		local size = self.Size
+		while true do
+			local left, right, highest = i * 2, i * 2 + 1, i
+			if left <= size and heapHigherPriority(self, left, highest) then highest = left end
+			if right <= size and heapHigherPriority(self, right, highest) then highest = right end
+			if highest == i then break end
+			heapSwap(self, i, highest)
+			i = highest
+		end
+	end
+
+	---Adds item to the queue, unless it's already present (same dedup behavior as before).
+	---O(log n).
 	function sortedQueueFallback:Enqueue(item)
 		if self.Set[item] then return end
 		self.Set[item] = true
-		for idx, v in ipairs(self) do if self.Func(item, v) then return table.insert(self, idx, item) end end
-		return table.insert(self, item)
+		self.Size = self.Size + 1
+		self.Heap[self.Size] = item
+		siftUp(self, self.Size)
 	end
+
+	---Removes and returns the highest priority item in the queue, or nil if empty. O(log n).
 	function sortedQueueFallback:Dequeue()
-		local item = table.remove(self)
-		if item then self.Set[item] = nil end
-		return item
+		local size = self.Size
+		if size == 0 then return nil end
+
+		local top = self.Heap[1]
+		self.Heap[1] = self.Heap[size]
+		self.Heap[size] = nil
+		self.Size = size - 1
+		if self.Size > 0 then siftDown(self, 1) end
+
+		self.Set[top] = nil
+		return top
 	end
 	
 	function lib.GetSplitStr(str, separator) return str == "" and {} or str:Split(separator) end

@@ -60,7 +60,7 @@ function D3bot.Debug.DrawNodeMetadata(player, nodeMetadata, lifetime, color)
 	for node, metadata in pairs(nodeMetadata) do
 		local pos = node.Pos
 		ClDebugOverlay.EntityTextAtPosition(player, pos, 1, "ZDF = "..tostring(metadata.ZombieDeathFactor), lifetime, color)
-		ClDebugOverlay.EntityTextAtPosition(player, pos, 2, "Survivors F. = "..tostring(metadata.PlayerFactorByTeam and metadata.PlayerFactorByTeam[TEAM_SURVIVOR]), lifetime, color)
+		ClDebugOverlay.EntityTextAtPosition(player, pos, 2, "Survivors F. = "..tostring(metadata.PlayerFactorByTeam and metadata.PlayerFactorByTeam[TEAM_HUMAN]), lifetime, color)
 		ClDebugOverlay.EntityTextAtPosition(player, pos, 3, "Undead F. = "..tostring(metadata.PlayerFactorByTeam and metadata.PlayerFactorByTeam[TEAM_UNDEAD]), lifetime, color)
 	end
 end

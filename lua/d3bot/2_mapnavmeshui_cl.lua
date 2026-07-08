@@ -30,7 +30,7 @@ return function(lib)
 
 	local nodeVisualProperties = {}
 	local nodeVisualPropertiesQueue = {}
-
+	
 	local blockedNodeById = {}
 	local blockedNodeUpdateQueue = {}
 
@@ -531,4 +531,3 @@ return function(lib)
 		end
 	end
 end
-

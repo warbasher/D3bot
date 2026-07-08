@@ -205,6 +205,8 @@ return function(lib)
 	
 	local editModeByPl = {}
 	
+	local function printEditMode(pl) pl:ChatPrint("Edit Mode: " .. editModes[editModeByPl[pl]].Name) end
+	
 	local subscribers = {}
 	local subscriptionTypeOrNilByPl = {}
 	
@@ -231,7 +233,6 @@ return function(lib)
 				pl:KillSilent()
 				pl:Spectate(OBS_MODE_ROAMING)
 			end
-
 			pl:SendLua(lib.GlobalK .. ".SetIsMapNavMeshViewEnabled(true)")
 		elseif subscriptionTypeOrNil == nil then
 			table.RemoveByValue(subscribers, pl)
@@ -255,13 +256,13 @@ return function(lib)
 			end
 
 			pl.m_Weapons = nil
-
 			pl:SendLua(lib.GlobalK .. ".SetIsMapNavMeshViewEnabled(false)")
 		end
 		if formerSubscriptionTypeOrNil == "edit" then clearSelection(pl) end
 		if subscriptionTypeOrNil == "edit" then
 			editModeByPl[pl] = 1
 			pl:SendLua(lib.GlobalK .. ".MapNavMeshEditMode = " .. 1)
+			printEditMode(pl)
 		end
 	end
 
@@ -292,7 +293,7 @@ return function(lib)
 		timer.Remove(getPathDebugTimerId(pl))
 		pl:SendLua(lib.GlobalK .. ".SetShownMapNavMeshPath{}")
 	end
-
+	
 	hook.Add("KeyPress", tostring({}), function(pl, key)
 		if subscriptionTypeOrNilByPl[pl] ~= "edit" then return end
 		if key == IN_RELOAD then
@@ -301,6 +302,7 @@ return function(lib)
 			else
 				editModeByPl[pl] = (editModeByPl[pl] % #editModes) + 1
 				pl:SendLua(lib.GlobalK .. ".MapNavMeshEditMode = " .. editModeByPl[pl])
+				printEditMode(pl)
 			end
 		else
 			local func = editModes[editModeByPl[pl]].FuncByKey[key]

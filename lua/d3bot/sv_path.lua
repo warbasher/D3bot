@@ -191,7 +191,6 @@ function D3bot.GetEscapeMeshPathOrNil(startNode, iterations, pathCostFunction, h
 		end
 		
 		for linkedNode, link in pairs(node.LinkByLinkedNode) do
-
 			local blocked = D3bot.IsNavMeshNodeBlocked(linkedNode.Params, linkedNode.Pos, GAMEMODE:GetWave())
 
 			local able = true

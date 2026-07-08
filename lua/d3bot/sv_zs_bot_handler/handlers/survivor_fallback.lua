@@ -5,7 +5,7 @@ HANDLER.angOffshoot = 20
 
 HANDLER.Fallback = true
 function HANDLER.SelectorFunction(zombieClassName, team)
-	return team == TEAM_SURVIVOR
+	return team == TEAM_HUMAN
 end
 
 ---Updates the bot move data every frame.
@@ -121,7 +121,7 @@ function HANDLER.ThinkFunction(bot)
 	
 	local function pathCostFunction(node, linkedNode, link)
 		local nodeMetadata = D3bot.NodeMetadata[linkedNode]
-		local playerFactorBySurvivors = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_SURVIVOR] or 0
+		local playerFactorBySurvivors = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_HUMAN] or 0
 		local playerFactorByUndead = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_UNDEAD] or 0
 		return playerFactorByUndead * 3000 - playerFactorBySurvivors * 4000
 	end
@@ -143,11 +143,7 @@ function HANDLER.ThinkFunction(bot)
 			local ammo = v:Clip1() + bot:GetAmmoCount(ammoType)
 			-- Silly cheat to prevent bots from running out of ammo TODO: Add buy logic
 			if ammo == 0 then
-				if bot:IsBot() then
-					bot:SetAmmo(50, ammoType)
-				else
-					bot:ConCommand("zs_quickbuyammo")
-				end
+				bot:SetAmmo(50, ammoType)
 			end
 			
 			if ammo > 0 and enemyDistance < maxDistance and bestRating < rating and weaponType == HANDLER.Weapon_Types.RANGED then
@@ -262,7 +258,7 @@ function HANDLER.FindEscapePath(bot, startNode, enemies)
 			--ClDebugOverlay.Line(GetPlayerByName("D3"), node.Pos, linkedNode.Pos, nil, Color(directionPenalty/2000*255, 0, 0), true)
 		end
 		local nodeMetadata = D3bot.NodeMetadata[linkedNode]
-		local playerFactorBySurvivors = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_SURVIVOR] or 0
+		local playerFactorBySurvivors = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_HUMAN] or 0
 		local playerFactorByUndead = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_UNDEAD] or 0
 		local cost = -playerFactorBySurvivors * 50 + playerFactorByUndead * 150 + (tempNodePenalty[linkedNode] or 0) * 500 + (directionPenalty or 0)
 		--for _, enemy in pairs(enemies) do
@@ -272,7 +268,7 @@ function HANDLER.FindEscapePath(bot, startNode, enemies)
 	end
 	local function heuristicCostFunction(node)
 		local nodeMetadata = D3bot.NodeMetadata[node]
-		--local playerFactorBySurvivors = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_SURVIVOR] or 0
+		--local playerFactorBySurvivors = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_HUMAN] or 0
 		local playerFactorByUndead = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_UNDEAD] or 0
 		return playerFactorByUndead * 150 + (tempNodePenalty[node] or 0) * 10
 	end
@@ -285,7 +281,7 @@ function HANDLER.FindPathToHuman(node)
 	end
 	local function heuristicCostFunction(node)
 		local nodeMetadata = D3bot.NodeMetadata[node]
-		local playerFactorBySurvivors = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_SURVIVOR] or 0
+		local playerFactorBySurvivors = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_HUMAN] or 0
 		local playerFactorByUndead = nodeMetadata and nodeMetadata.PlayerFactorByTeam and nodeMetadata.PlayerFactorByTeam[TEAM_UNDEAD] or 0
 		return -playerFactorBySurvivors * 1600000 + playerFactorByUndead * 500000
 	end

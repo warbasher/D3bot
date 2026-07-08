@@ -49,7 +49,6 @@ function D3bot.Basics.Walk(bot, pos, aimAngle, slowdown, proximity)
 			mem.BlockedOnNode = nil
 		end
 	end
-
 	local nodeOrNil = mem.NodeOrNil
 	local nextNodeOrNil = mem.NextNodeOrNil
 	local currentLinkOrNil
@@ -87,28 +86,29 @@ function D3bot.Basics.Walk(bot, pos, aimAngle, slowdown, proximity)
 				bot:D3bot_AngsRotateTo((-tr.HitNormal):Angle(), 1)
 			end
 		else
-			bot:D3bot_AngsRotateTo(Vector(pos.x-origin.x, pos.y-origin.y, 0):Angle(), 0.5)
+			bot:D3bot_AngsRotateTo(Vector(pos.x-origin.x, pos.y-origin.y, 0):Angle(), 1)
 		end
 	else
-		if mem.BarricadeAttackEntity and mem.BarricadeAttackPos and mem.BarricadeAttackEntity:IsValid() and mem.BarricadeAttackPos:DistToSqr(origin) < 100*100 then
+		-- This makes bots just whip around like retards
+		--[[if mem.BarricadeAttackEntity and mem.BarricadeAttackPos and mem.BarricadeAttackEntity:IsValid() and mem.BarricadeAttackPos:DistToSqr(origin) < 100*100 then
 			-- We have a barricade entity to attack, so we aim for this one.
 			offshootAngle = bot:D3bot_GetOffshoot(0.1)
 			aimAngle = aimAngle or (mem.BarricadeAttackPos - bot:GetShootPos()):Angle()
 			bot:D3bot_AngsRotateTo(aimAngle + offshootAngle, 0.5)
+			print("aiming at barricade entity")
 			--ClDebugOverlay.Line(GetPlayerByName("D3"), bot:GetShootPos(), mem.BarricadeAttackPos, 1, Color(0,255,0), false)
-		else
+		else]]
 			-- Target is invalid or too far away, forget about it.
 			-- We will either use the given aim angle, or calculate it based on the walk position.
 			offshootAngle = bot:D3bot_GetOffshoot(aimStraight and 0 or 1)
 			aimAngle = aimAngle or (pos - origin):Angle()
 			bot:D3bot_AngsRotateTo(aimAngle + offshootAngle, aimStraight and 1 or D3bot.BotAngLerpFactor)
 			mem.BarricadeAttackPos, mem.BarricadeAttackEntity = nil, nil
-		end
+		--end
 	end
 
 	local duckParam, duckToParam, jumpParam, jumpToParam
 	local maxHeightParam, nextMaxHeightParam
-	local pathParam, ladderParam
 
 	if D3bot.UsingSourceNav then
 		duckParam = nodeOrNil and nodeOrNil:GetMetaData().Params.Duck
@@ -128,7 +128,6 @@ function D3bot.Basics.Walk(bot, pos, aimAngle, slowdown, proximity)
 		if not jumpToParam and currentLinkOrNil and currentLinkOrNil.Params.Jumping == "Needed" and nextNodeOrNil and nodeOrNil and nextNodeOrNil.Pos.Z > nodeOrNil.Pos.Z then
 			jumpToParam = "Close"
 		end
-
 		maxHeightParam = nodeOrNil and nodeOrNil.Params.MaxHeight
 		nextMaxHeightParam = nextNodeOrNil and nextNodeOrNil.Params.MaxHeight
 	end
@@ -157,7 +156,7 @@ function D3bot.Basics.Walk(bot, pos, aimAngle, slowdown, proximity)
 	end
 
 	local velocity = bot:GetVelocity():Length2D()
-	local facesHindrance = velocity < 0.25 * speed
+	local facesHindrance = velocity < (0.25 * speed)
 	local minorStuck, majorStuck = bot:D3bot_CheckStuck()
 
 	if not facesHindrance then
@@ -200,10 +199,8 @@ function D3bot.Basics.Walk(bot, pos, aimAngle, slowdown, proximity)
 
 		mem.IsOnLadder = false
 	end
-
 	if bot:GetMoveType() ~= MOVETYPE_LADDER then
 		mem.IsOnLadder = false
-
 		local botOnGround = bot:IsOnGround()
 		if botOnGround or bot:WaterLevel() > 0 then
 			-- If we should climb, jump while we're on the ground.
@@ -232,24 +229,26 @@ function D3bot.Basics.Walk(bot, pos, aimAngle, slowdown, proximity)
 				end
 			end
 		else
-			actions.Duck = true
+			-- Only allow crouching if we started the jump
+			if bot.m_IsJumping then
+				actions.Duck = true
+			end
 		end
 
 		if shouldClimb and not botOnGround then
-			-- If we are airborne and should be climbing, try to climb the surface.
-			actions.Attack2 = true
-			-- Calculate climbing speeds.
-			---@type GWeapon|table
-			local weapon = bot:GetActiveWeapon()
-			if weapon and weapon.GetClimbing and weapon:GetClimbing() then
-				local yaw1 = bot:GetForward():Angle().yaw
+		-- If we are airborne and should be climbing, try to climb the surface.
+		actions.Attack2 = true
+		-- Calculate climbing speeds.
+		---@type GWeapon|table
+		local weapon = bot:GetActiveWeapon()
+		if weapon and weapon.GetClimbing and weapon:GetClimbing() then
+		local yaw1 = bot:GetForward():Angle().yaw
 				local yaw2 = Vector(pos.x-origin.x, pos.y-origin.y, 0):Angle().yaw
 				movementVector.y = math.AngleDifference(yaw2, yaw1)
 				movementVector.x = (pos.z - origin.z + 20) * 10
 				if (math.abs(movementVector.x) < 20 or bot:GetVelocity():Length() < 10) and math.abs(movementVector.y) > 1 then movementVector.x = 0 end
 			end
 		end
-		
 	elseif minorStuck then
 		-- Stuck on ladder
 		actions.Jump = true
@@ -309,7 +308,6 @@ function D3bot.Basics.WalkAttackAuto(bot)
 			mem.BlockedOnNode = nil
 		end
 	end
-
 	local nodeOrNil = mem.NodeOrNil
 	local nextNodeOrNil = mem.NextNodeOrNil
 	local currentLinkOrNil
@@ -366,6 +364,9 @@ function D3bot.Basics.WalkAttackAuto(bot)
 	local attackPos = bot:D3bot_GetAttackPosOrNilFuture(nil, math.Rand(0, D3bot.BotAimPosVelocityOffshoot)) -- Target attack position, for aiming.
 	local movePos = attackPos or bot:GetPos() -- Target movement position.
 
+	-- This fixes the annoying jumping when attacking players
+	local attackingTarget
+
 	if attackPos and attackPos:DistToSqr(origin) < math.pow(range, 2) then
 		--ClDebugOverlay.Line(GetPlayerByName("D3"), bot:GetShootPos(), attackPos, 1, Color(255,255,0), false)
 
@@ -374,6 +375,7 @@ function D3bot.Basics.WalkAttackAuto(bot)
 		if attackPos.z < bot:GetPos().z + bot:GetViewOffsetDucked().z then
 			actions.Duck = true
 		end
+		attackingTarget = true
 	elseif mem.BarricadeAttackEntity and mem.BarricadeAttackPos then
 		-- We are not within attack range, but we have a barricade entity to attack.
 		-- So we aim for this one, instead.
@@ -438,7 +440,7 @@ function D3bot.Basics.WalkAttackAuto(bot)
 	end
 
 	local velocity = bot:GetVelocity():Length2D()
-	local facesHindrance = velocity < 0.25 * speed
+	local facesHindrance = (velocity < (0.25 * speed))
 	local minorStuck, majorStuck = bot:D3bot_CheckStuck()
 
 	if not facesHindrance then
@@ -481,10 +483,8 @@ function D3bot.Basics.WalkAttackAuto(bot)
 
 		mem.IsOnLadder = false
 	end
-
 	if bot:GetMoveType() ~= MOVETYPE_LADDER then
 		mem.IsOnLadder = false
-
 		if bot:IsOnGround() or bot:WaterLevel() > 0 then
 			if jumpParam == "Always" or jumpToParam == "Always" then
 				actions.Jump = true
@@ -503,10 +503,10 @@ function D3bot.Basics.WalkAttackAuto(bot)
 				end
 			end
 			if facesHindrance then
-				if math.random(D3bot.BotJumpAntichance) == 1 then
+				if (not attackingTarget) and math.random(D3bot.BotJumpAntichance) == 1 then
 					actions.Jump = true
 				end
-				if math.random(D3bot.BotDuckAntichance) == 1 then
+				if (not attackingTarget) and math.random(D3bot.BotDuckAntichance) == 1 then
 					actions.Duck = true
 				end
 			end
@@ -582,11 +582,12 @@ function D3bot.Basics.PounceAuto(bot, crab)
 	if nextNodeOrNil and D3bot.UsingSourceNav then
 		tempDist = tempDist + tempPos:Distance(nextNodeOrNil:GetCenter())
 		tempPos = nextNodeOrNil:GetCenter()
+		local link = nextNodeOrNil:SharesLink(nodeOrNil)
 		table.insert(pounceTargetPositions, {
 			Pos = nextNodeOrNil:GetCenter() + Vector(0, 0, 1),
 			Dist = tempDist,
 			TimeFactor = 1.1,
-			ForcePounce = (nextNodeOrNil:SharesLink(nodeOrNil) and (crab and nextNodeOrNil:SharesLink(nodeOrNil):GetMetaData().Params.CrabPouncing == "Needed" or not crab and nextNodeOrNil:SharesLink(nodeOrNil):GetMetaData().Params.Pouncing == "Needed"))
+			ForcePounce = (link and (crab and link:GetMetaData().Params.CrabPouncing == "Needed" or not crab and link:GetMetaData().Params.Pouncing == "Needed"))
 		})
 	elseif nextNodeOrNil then
 		tempDist = tempDist + tempPos:Distance(nextNodeOrNil.Pos)
@@ -685,7 +686,6 @@ function D3bot.Basics.AimAndShoot(bot, target, maxDistance)
 			mem.BlockMovementUntil = nil
 		end
 	end
-
 	local actions = {}
 	local reloading
 
@@ -706,14 +706,15 @@ function D3bot.Basics.AimAndShoot(bot, target, maxDistance)
 	if maxDistance and origin:DistToSqr(targetPos) > math.pow(maxDistance, 2) then return false, {}, nil, nil, nil, angle_zero, false, false, false end
 
 	-- TODO: Use fewer traces, cache result for a few frames
-	local tr = util.TraceLine({
+	/*local tr = util.TraceLine({
 		start = origin,
 		endpos = targetPos,
 		filter = player.GetAll(),
 		mask = MASK_SHOT_HULL
 	})
-	local canShootTarget = not tr.Hit
+	local canShootTarget = not tr.Hit*/
 
+	local canShootTarget = bot:D3bot_CanSeeTargetCached(nil, target)
 	if not canShootTarget then mem.AimHeightFactor = math.Rand(0.5, 1) end
 
 	actions.Attack = not reloading and bot:D3bot_IsLookingAt(targetPos, 0.8) and canShootTarget and not mem.WasPressingAttack

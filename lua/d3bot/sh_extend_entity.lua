@@ -10,5 +10,5 @@ function meta:D3bot_IsBarricade()
 
 	-- Use IsBarricadeObject property of some entities.
 	-- This is true for prop_aegisboard and prop_arsenalcrate, basically anything that players can use to block zombies.
-	return self.IsBarricadeObject or false
+	return self:IsBarricadeObject() or self:IsNailed()
 end

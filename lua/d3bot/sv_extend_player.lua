@@ -171,7 +171,7 @@ end
 function meta:D3bot_RerollClass(classes)
 	if not GAMEMODE:GetWaveActive() then return end
 	--if self:GetZombieClassTable().Name == "Zombie Torso" then return end -- ???
-	if GAMEMODE.ZombieEscape or GAMEMODE.PantsMode or GAMEMODE:IsClassicMode() or GAMEMODE:IsBabyMode() then return end
+
 	local zombieClasses = {}
 	for _, class in ipairs(classes) do
 		local zombieClass = GAMEMODE.ZombieClasses[class]
@@ -217,6 +217,8 @@ function meta:D3bot_SetNodeTgtOrNil(targetNode) -- Set the node as target, bot w
 	mem.PosTgtOrNil, mem.PosTgtProximity = nil, nil
 	mem.NodeTgtOrNil = targetNode
 end
+
+util.AddNetworkString("RecBotControl")
 
 function meta:D3bot_InitializeOrReset()
 	---@class D3bot_Mem
@@ -267,6 +269,14 @@ function meta:D3bot_InitializeOrReset()
 	self.D3bot_Mem = self.D3bot_Mem or {}
 	local mem = self.D3bot_Mem
 
+	if self:IsBot() then
+		DB.SetupDefaults(self)
+	else
+		net.Start("RecBotControl")
+			net.WriteBool(true)
+		net.Send(self)
+	end
+
 	local considerPathLethality = math.random(1, D3bot.BotConsideringDeathCostAntichance) == 1
 
 	mem.TgtOrNil = nil										-- Target entity to walk to and attack.
@@ -292,6 +302,8 @@ function meta:D3bot_InitializeOrReset()
 	mem.JumpHeight = 30
 	mem.JumpCrouchHeight = 68
 	mem.CrouchJumpHeight = 70
+	mem.Height = 72
+	mem.CrouchHeight = 36
 
 	mem.IsOnLadder = false
 
@@ -313,7 +325,7 @@ function meta:D3bot_InitializeOrReset()
 
 		-- Calculate jump heights.
 
-		-- Gravitational acceleration in source units/sÂ².
+		-- Gravitational acceleration in source units/s².
 		local g = physenv.GetGravity().z * (self:GetGravity() ~= 0 and self:GetGravity() or 1)
 
 		mem.JumpHeight = D3bot.CalculateJumpHeight(myClass.JumpPower or DEFAULT_JUMP_POWER, g, false)
@@ -324,6 +336,16 @@ end
 
 function meta:D3bot_Deinitialize()
 	self.D3bot_Mem = nil
+
+	if self:IsPlayer() then
+		local curAngles = self:EyeAngles()
+		curAngles.r = 0
+		self:SetEyeAngles(curAngles)
+
+		net.Start("RecBotControl")
+			net.WriteBool(false)
+		net.Send(self)
+	end
 end
 
 function meta:D3bot_UpdateAngsOffshoot(angOffshoot)

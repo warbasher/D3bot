@@ -37,9 +37,9 @@ local NextSupervisor🤔 = CurTime()
 local NextStorePos = CurTime()
 hook.Add("Think", D3bot.BotHooksId.."🤔", function()
 	if not D3bot.IsEnabledCached then return end
-	
+
 	-- General bot handler think function
-	for _, bot in ipairs(D3bot.GetBots()) do
+	for _, bot in ipairs(player.GetBots()) do
 		
 		if not D3bot.UseConsoleBots then
 			-- Hackish method to get bots back into game. (player.CreateNextBot created bots do not trigger the StartCommand hook while they are dead)
@@ -116,7 +116,7 @@ local hadBonusByPl = {}
 hook.Add("PlayerSpawn", D3bot.BotHooksId.."PlayerSpawn", function(pl)
 	if not D3bot.IsEnabledCached then return end
 	if pl.D3bot_Mem then pl:D3bot_InitializeOrReset() end
-	if D3bot.IsEnabledCached and D3bot.StartBonus and D3bot.StartBonus > 0 and pl:Team() == TEAM_SURVIVOR then
+	if D3bot.IsEnabledCached and D3bot.StartBonus and D3bot.StartBonus > 0 and pl:Team() == TEAM_HUMAN then
 		local hadBonus = hadBonusByPl[pl]
 		hadBonusByPl[pl] = true
 		pl:SetPoints(hadBonus and 0 or D3bot.StartBonus)

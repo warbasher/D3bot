@@ -1,3 +1,8 @@
+local meta = FindMetaTable("Player")
+function meta:IsBeingControlled()
+	return SERVER and self.D3bot_Mem or self.m_IsBeingControlled
+end
+
 function D3bot.GetTrajectories2DParams(g, initVel, distZ, distRad)
 	local trajectories = {}
 	local radix = initVel^4 - g*(g*distRad^2 + 2*distZ*initVel^2)
@@ -108,11 +113,103 @@ D3bot.NodeBlockingMap = {
 	classes = {func_breakable = true, prop_dynamic = true, prop_door_rotating = true, func_door = true, func_movelinear = true}
 }
 
+-- PERFORMANCE NOTE: D3bot.IsNavMeshNodeBlocked() (below) is called once per link evaluated
+-- during A* pathfinding (see sv_path.lua), which is itself already one of the more expensive
+-- things this addon does per the benchmark comments in that file. The underlying
+-- ents.FindInBox()/ents.FindInSphere() world queries it does are comparatively expensive to
+-- repeat on every single call. In practice, node-blocking state (barricades built/destroyed,
+-- wave changing) changes far less often than it gets checked -- many bots pathing through the
+-- same area re-check the exact same nodes many times per second. We cache the result per node
+-- for a short duration instead of re-querying the world every time.
+local nodeBlockedCache = {}
+local nodeBlockedCacheDuration = 0.25 -- Seconds. Short enough to pick up gameplay-relevant changes quickly (new barricade, wave change), long enough to absorb bursts of path searches happening in the same tick/frame.
+
+---Clears the entire blocked-node cache. Called whenever something that could affect node
+---blocking changes: a relevant entity is created/removed (see hooks below), or the navmesh
+---itself is edited (see fallback:InvalidateCache in 1_navmesh.lua).
+---We don't try to figure out which specific nodes are affected by a given entity -- clearing
+---the whole cache is cheap (a table wipe) and this only runs on relatively rare events, not
+---on every tick.
+function D3bot.InvalidateNodeBlockedCache()
+	table.Empty(nodeBlockedCache)
+end
+
+local function entityCouldAffectNodeBlocking(ent)
+	if not IsValid(ent) then return false end
+	local class = ent:GetClass()
+	local nodeBlocking, nodeBlockingMap = D3bot.NodeBlocking, D3bot.NodeBlockingMap
+	return (nodeBlocking and nodeBlocking.classes[class]) or (nodeBlockingMap and nodeBlockingMap.classes[class])
+	-- NOTE: this deliberately doesn't check individual nodes' BlockEntity values (arbitrary
+	-- entity classes set per-node in the navmesh editor). Checking against every node's
+	-- BlockEntity here would defeat the point of a cheap invalidation check, and creating/
+	-- removing an entity that happens to match some node's BlockEntity is rare enough that we
+	-- accept up to nodeBlockedCacheDuration seconds of staleness for that specific case.
+end
+
+hook.Add("OnEntityCreated", "D3bot_InvalidateNodeBlockedCache", function(ent)
+	-- Deferred: ent:GetClass() and other properties aren't guaranteed to be valid the instant
+	-- OnEntityCreated fires.
+	timer.Simple(0, function()
+		if entityCouldAffectNodeBlocking(ent) then
+			D3bot.InvalidateNodeBlockedCache()
+		end
+	end)
+end)
+hook.Add("EntityRemoved", "D3bot_InvalidateNodeBlockedCache", function(ent)
+	if entityCouldAffectNodeBlocking(ent) then
+		D3bot.InvalidateNodeBlockedCache()
+	end
+end)
+
+---Returns tonumber(params[key]), caching the parsed result on the params table itself so
+---repeated calls (read on every path search, for every node with the given param set) don't
+---re-parse the same string over and over. The cache entry is invalidated automatically
+---whenever SetParam() writes a new raw value for that key -- see itemFallback:SetParam in
+---1_navmesh.lua.
+---@param params table
+---@param key string
+---@return number|nil
+function D3bot.GetCachedNumberParam(params, key)
+	local cacheKey = "_NumCache_" .. key
+	local cached = params[cacheKey]
+	if cached ~= nil then
+		if cached == false then return nil end -- "not a number" is cached as false, since nil is indistinguishable from "not cached yet".
+		return cached
+	end
+
+	local num = tonumber(params[key])
+	params[cacheKey] = num or false
+	return num
+end
+
+---Returns whether the given node is currently blocked, for the given wave. Results are
+---cached briefly -- see nodeBlockedCacheDuration above.
 ---@param nodeParams table
 ---@param nodePos GVector
 ---@param wave number
 ---@return boolean
 function D3bot.IsNavMeshNodeBlocked(nodeParams, nodePos, wave)
+	-- The node's Params table identity is used as the cache key: each node has its own
+	-- unique Params table, so this uniquely (and cheaply) identifies the node without an
+	-- explicit node ID needing to be passed in.
+	local cacheEntry = nodeBlockedCache[nodeParams]
+	local now = CurTime()
+	if cacheEntry and cacheEntry.Wave == wave and (now - cacheEntry.Time) < nodeBlockedCacheDuration then
+		return cacheEntry.Blocked
+	end
+
+	local blocked = D3bot.CalculateIsNavMeshNodeBlocked(nodeParams, nodePos, wave)
+	nodeBlockedCache[nodeParams] = { Blocked = blocked, Wave = wave, Time = now }
+	return blocked
+end
+
+---The actual (uncached) blocked-node calculation. Kept separate from the cache handling in
+---D3bot.IsNavMeshNodeBlocked() above so each stays simple on its own.
+---@param nodeParams table
+---@param nodePos GVector
+---@param wave number
+---@return boolean
+function D3bot.CalculateIsNavMeshNodeBlocked(nodeParams, nodePos, wave)
 	local nodeBlocking = D3bot.NodeBlocking
 	local nodeBlockingMap = D3bot.NodeBlockingMap
 	if not nodeBlocking or not nodeBlockingMap then return false end
@@ -136,8 +233,13 @@ function D3bot.IsNavMeshNodeBlocked(nodeParams, nodePos, wave)
 		end
 	end
 
+	-- BlockRadius/BlockBeforeWave/BlockAfterWave come from navmesh param strings. The
+	-- original code called tonumber() on these directly, every call (BlockBeforeWave's was
+	-- even called twice per check). These rarely change at runtime -- only via the navmesh
+	-- editor -- so we cache the parsed number on the params table itself. See
+	-- D3bot.GetCachedNumberParam above.
 	if nodeParams.BlockEntity then
-		local blockRadius = tonumber(nodeParams.BlockRadius)
+		local blockRadius = D3bot.GetCachedNumberParam(nodeParams, "BlockRadius")
 		if blockRadius then
 			for _, ent in ipairs(ents.FindInSphere(nodePos, blockRadius)) do
 				if ent:GetClass() == nodeParams.BlockEntity then
@@ -147,12 +249,11 @@ function D3bot.IsNavMeshNodeBlocked(nodeParams, nodePos, wave)
 		end
 	end
 
-	if nodeParams.BlockBeforeWave and tonumber(nodeParams.BlockBeforeWave) then
-		if wave < tonumber(nodeParams.BlockBeforeWave) then return true end
-	end
-	if nodeParams.BlockAfterWave and tonumber(nodeParams.BlockAfterWave) then
-		if wave > tonumber(nodeParams.BlockAfterWave) then return true end
-	end
+	local blockBeforeWave = D3bot.GetCachedNumberParam(nodeParams, "BlockBeforeWave")
+	if blockBeforeWave and wave < blockBeforeWave then return true end
+
+	local blockAfterWave = D3bot.GetCachedNumberParam(nodeParams, "BlockAfterWave")
+	if blockAfterWave and wave > blockAfterWave then return true end
 
 	return false
 end
@@ -178,16 +279,4 @@ function D3bot.NeighbourNodeFalloff(startNode, iterations, startValue, falloff, 
 		end
 	end
 	return nodes
-end
-
----Return all players that are controller by D3bot, this includes real players that D3bot is in control of.
----@return GPlayer[]
-function D3bot.GetBots()
-	local bots = {}
-	for _, v in pairs(player.GetAll()) do
-		if v.D3bot_Mem then
-			table.insert(bots, v)
-		end
-	end
-	return bots
 end
