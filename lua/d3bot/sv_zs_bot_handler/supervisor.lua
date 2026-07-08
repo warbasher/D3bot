@@ -158,7 +158,6 @@ function D3bot.MaintainBotRoles()
 						-- invisible to MaintainBotRoles' team counting below, so it kept
 						-- spawning replacements forever.
 						if bot:Team() ~= team then
-							SendToDiscordDebugLog(string.format("[D3bot] Bot '%s' missed its PlayerInitialSpawn team assignment (race condition), fixing up to team %d.", bot:Nick(), team))
 							bot:SetTeam(team)
 							GAMEMODE:PlayerInitialSpawn(bot)
 						end
