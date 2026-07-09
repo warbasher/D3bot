@@ -91,6 +91,28 @@ function D3bot.GetTrajectories(initVel, r0, r1, segments)
 	return trajectories
 end
 
+-- PERFORMANCE: player.GetAll() allocates and returns a brand new table on every single call --
+-- it's not a cached reference to anything. Several bots each independently calling it once or
+-- twice per tick (trace filters, target scans, enemy lists) adds up to N-bots x M-call-sites
+-- fresh full-roster allocations per tick, most of which don't need to differ from one another
+-- within the same tick. D3bot.GetCachedPlayerList() below refreshes once per unique CurTime()
+-- (i.e. once per server tick, since CurTime() is stable within a tick) and every caller within
+-- that tick shares the same table.
+--
+-- IMPORTANT: the returned table is shared across every caller in the current tick. Treat it as
+-- read-only -- do not sort it, insert into it, or remove from it in place. If you need a
+-- modified/filtered copy (e.g. via D3bot.RemoveObsDeadTgts or D3bot.From(...):Where(...)),
+-- that's fine and safe, since those return a new table rather than mutating their input.
+local cachedPlayerList, cachedPlayerListTime = {}, -1
+function D3bot.GetCachedPlayerList()
+	local now = CurTime()
+	if cachedPlayerListTime ~= now then
+		cachedPlayerListTime = now
+		cachedPlayerList = player.GetAll()
+	end
+	return cachedPlayerList
+end
+
 -- Remove spectating, meshing and dead players
 function D3bot.RemoveObsDeadTgts(tgts)
 	return D3bot.From(tgts):Where(function(k, v) return IsValid(v) and v:GetObserverMode() == OBS_MODE_NONE and not v:IsFlagSet(FL_NOTARGET) and v:Alive() end).R
@@ -161,25 +183,51 @@ hook.Add("EntityRemoved", "D3bot_InvalidateNodeBlockedCache", function(ent)
 	end
 end)
 
----Returns tonumber(params[key]), caching the parsed result on the params table itself so
----repeated calls (read on every path search, for every node with the given param set) don't
----re-parse the same string over and over. The cache entry is invalidated automatically
----whenever SetParam() writes a new raw value for that key -- see itemFallback:SetParam in
----1_navmesh.lua.
+---Cache for D3bot.GetCachedNumberParam, keyed by the params table itself (weak keys, so an
+---entry disappears on its own once the corresponding node/link's Params table is garbage
+---collected -- no separate cleanup needed when nodes get deleted in the navmesh editor).
+---
+---IMPORTANT: this is a *separate* table from item.Params on purpose. An earlier version of
+---this cache stored its entries directly inside item.Params (e.g. params["_NumCache_"..key]).
+---That silently broke the navmesh editor's on-screen param display, which iterates over
+---every key in item.Params and concatenates it into a string -- the cache's internal false
+---sentinel (see below) is a boolean, and Lua's `..` can't concatenate a boolean, which is
+---what caused the "attempt to concatenate local 'v' (a boolean value)" error in
+---2_mapnavmeshui_cl.lua. item.Params must only ever contain real, user-set param values.
+local numberParamCache = setmetatable({}, { __mode = "k" })
+
+---Returns tonumber(params[key]), caching the parsed result so repeated calls (read on every
+---path search, for every node with the given param set) don't re-parse the same string over
+---and over. The cache entry is invalidated automatically whenever SetParam() writes a new raw
+---value for that key -- see itemFallback:SetParam in 1_navmesh.lua.
 ---@param params table
 ---@param key string
 ---@return number|nil
 function D3bot.GetCachedNumberParam(params, key)
-	local cacheKey = "_NumCache_" .. key
-	local cached = params[cacheKey]
+	local cacheForParams = numberParamCache[params]
+	if not cacheForParams then
+		cacheForParams = {}
+		numberParamCache[params] = cacheForParams
+	end
+
+	local cached = cacheForParams[key]
 	if cached ~= nil then
 		if cached == false then return nil end -- "not a number" is cached as false, since nil is indistinguishable from "not cached yet".
 		return cached
 	end
 
 	local num = tonumber(params[key])
-	params[cacheKey] = num or false
+	cacheForParams[key] = num or false
 	return num
+end
+
+---Clears any cached number for a specific param, e.g. because it was just changed in the
+---navmesh editor. Called from itemFallback:SetParam in 1_navmesh.lua.
+---@param params table
+---@param key string
+function D3bot.InvalidateNumberParamCache(params, key)
+	local cacheForParams = numberParamCache[params]
+	if cacheForParams then cacheForParams[key] = nil end
 end
 
 ---Returns whether the given node is currently blocked, for the given wave. Results are

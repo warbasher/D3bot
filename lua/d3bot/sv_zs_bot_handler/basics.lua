@@ -63,9 +63,18 @@ function D3bot.Basics.Walk(bot, pos, aimAngle, slowdown, proximity)
 	local actions = {}
 
 	-- Check if the bot needs to climb while being on a node or going towards a node. As maneuvering while climbing is different, this will change/override some movement actions.
+	-- PERFORMANCE: nodeOrNil:GetMetaData()/nextNodeOrNil:GetMetaData() are cached into
+	-- nodeMetaOrNil/nextNodeMetaOrNil here (once each) instead of being called again for
+	-- every single param lookup below. GetMetaData() does a table lookup keyed by
+	-- node:GetID() -- cheap on its own, but this function runs every tick for every walking
+	-- bot, and it was being called up to 8 times per invocation (6 of them for the exact same
+	-- two nodes) where 2 calls does the same job.
+	local nodeMetaOrNil, nextNodeMetaOrNil
 	local shouldClimb
 	if D3bot.UsingSourceNav then
-		shouldClimb = (nodeOrNil and nodeOrNil:GetMetaData().Params.Climbing == "Needed") or (nextNodeOrNil and nextNodeOrNil:GetMetaData().Params.Climbing == "Needed")
+		nodeMetaOrNil = nodeOrNil and nodeOrNil:GetMetaData()
+		nextNodeMetaOrNil = nextNodeOrNil and nextNodeOrNil:GetMetaData()
+		shouldClimb = (nodeMetaOrNil and nodeMetaOrNil.Params.Climbing == "Needed") or (nextNodeMetaOrNil and nextNodeMetaOrNil.Params.Climbing == "Needed")
 	else
 		shouldClimb = (nodeOrNil and nodeOrNil.Params.Climbing == "Needed") or (nextNodeOrNil and nextNodeOrNil.Params.Climbing == "Needed")
 	end
@@ -111,12 +120,12 @@ function D3bot.Basics.Walk(bot, pos, aimAngle, slowdown, proximity)
 	local maxHeightParam, nextMaxHeightParam
 
 	if D3bot.UsingSourceNav then
-		duckParam = nodeOrNil and nodeOrNil:GetMetaData().Params.Duck
-		duckToParam = nextNodeOrNil and nextNodeOrNil:GetMetaData().Params.DuckTo
-		jumpParam = nodeOrNil and nodeOrNil:GetMetaData().Params.Jump
-		jumpToParam = nextNodeOrNil and nextNodeOrNil:GetMetaData().Params.JumpTo
-		maxHeightParam = nodeOrNil and nodeOrNil:GetMetaData().Params.MaxHeight
-		nextMaxHeightParam = nextNodeOrNil and nextNodeOrNil:GetMetaData().Params.MaxHeight
+		duckParam = nodeMetaOrNil and nodeMetaOrNil.Params.Duck
+		duckToParam = nextNodeMetaOrNil and nextNodeMetaOrNil.Params.DuckTo
+		jumpParam = nodeMetaOrNil and nodeMetaOrNil.Params.Jump
+		jumpToParam = nextNodeMetaOrNil and nextNodeMetaOrNil.Params.JumpTo
+		maxHeightParam = nodeMetaOrNil and nodeMetaOrNil.Params.MaxHeight
+		nextMaxHeightParam = nextNodeMetaOrNil and nextNodeMetaOrNil.Params.MaxHeight
 	else
 		duckParam = nodeOrNil and nodeOrNil.Params.Duck
 		duckToParam = nextNodeOrNil and nextNodeOrNil.Params.DuckTo
@@ -705,15 +714,6 @@ function D3bot.Basics.AimAndShoot(bot, target, maxDistance)
 
 	if maxDistance and origin:DistToSqr(targetPos) > math.pow(maxDistance, 2) then return false, {}, nil, nil, nil, angle_zero, false, false, false end
 
-	-- TODO: Use fewer traces, cache result for a few frames
-	/*local tr = util.TraceLine({
-		start = origin,
-		endpos = targetPos,
-		filter = player.GetAll(),
-		mask = MASK_SHOT_HULL
-	})
-	local canShootTarget = not tr.Hit*/
-
 	local canShootTarget = bot:D3bot_CanSeeTargetCached(nil, target)
 	if not canShootTarget then mem.AimHeightFactor = math.Rand(0.5, 1) end
 
@@ -742,7 +742,7 @@ end
 function D3bot.Basics.LookAround(bot)
 	local mem = bot.D3bot_Mem
 
-	if math.random(200) == 1 then mem.LookTarget = table.Random(player.GetAll()) end
+	if math.random(200) == 1 then mem.LookTarget = table.Random(D3bot.GetCachedPlayerList()) end
 
 	if not IsValid(mem.LookTarget) then return false, {}, nil, nil, nil, angle_zero, false, false, false end
 

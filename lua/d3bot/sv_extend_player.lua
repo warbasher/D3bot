@@ -100,7 +100,7 @@ function meta:D3bot_CanSeeTarget(fraction, target)
 	local tr = D3bot.BotSeeTr
 	tr.start = self:EyePos()
 	tr.endpos = attackPos
-	tr.filter = player.GetAll()
+	tr.filter = D3bot.GetCachedPlayerList()
 	return attackPos and not util.TraceHull(tr).Hit
 end
 
@@ -325,7 +325,7 @@ function meta:D3bot_InitializeOrReset()
 
 		-- Calculate jump heights.
 
-		-- Gravitational acceleration in source units/s².
+		-- Gravitational acceleration in source units/sÂ².
 		local g = physenv.GetGravity().z * (self:GetGravity() ~= 0 and self:GetGravity() or 1)
 
 		mem.JumpHeight = D3bot.CalculateJumpHeight(myClass.JumpPower or DEFAULT_JUMP_POWER, g, false)
@@ -457,7 +457,7 @@ function meta:D3bot_CanSeeTarget( fraction, target )
 	local tr = D3bot.BotSeeTr
 	tr.start = self:EyePos()
 	tr.endpos = attackPos
-	tr.filter = player.GetAll()
+	tr.filter = D3bot.GetCachedPlayerList()
 	return attackPos and not util.TraceHull( tr ).Hit
 end
 

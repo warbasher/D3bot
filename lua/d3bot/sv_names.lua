@@ -7,7 +7,7 @@ end
 
 local function getUsernames()
 	local usernames = {}
-	for k, v in pairs(player.GetAll()) do
+	for k, v in pairs(D3bot.GetCachedPlayerList()) do
 		usernames[v:Nick()] = v
 	end
 	return usernames

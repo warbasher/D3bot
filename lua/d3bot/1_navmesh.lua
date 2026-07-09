@@ -174,8 +174,10 @@ return function(lib)
 		end
 		-- Also clear the blocked-node cache (see sh_utilities.lua) -- a navmesh edit can
 		-- change any node's Condition/BlockEntity/etc, which the cache doesn't otherwise
-		-- know about.
-		if D3bot.InvalidateNodeBlockedCache then D3bot.InvalidateNodeBlockedCache() end
+		-- know about. Guarded against D3bot itself being nil: the navmesh gets deserialized
+		-- from disk very early during addon load (see LoadMapNavMesh), potentially before
+		-- sh_utilities.lua (which defines D3bot.InvalidateNodeBlockedCache) has run.
+		if D3bot and D3bot.InvalidateNodeBlockedCache then D3bot.InvalidateNodeBlockedCache() end
 	end
 
 	function fallback:ForceGetItem(id) return isnumber(id) and self:ForceGetNode(id) or self:ForceGetLink(id) end
@@ -231,8 +233,11 @@ return function(lib)
 		item.HasArea = not not (params.AreaXMin and params.AreaXMax and params.AreaYMin and params.AreaYMax)
 		-- Clear any cached tonumber() result for this param (see D3bot.GetCachedNumberParam
 		-- in sh_utilities.lua), so a value edited in the navmesh UI takes effect immediately
-		-- instead of the pathfinding blocked-node check keeping the old parsed number.
-		params["_NumCache_" .. paramName] = nil
+		-- instead of the pathfinding blocked-node check keeping the old parsed number. This
+		-- cache lives in a separate side table, NOT inside params itself -- params must only
+		-- ever contain real, user-set values, since the navmesh editor UI iterates over it
+		-- directly to display it on screen.
+		if D3bot and D3bot.InvalidateNumberParamCache then D3bot.InvalidateNumberParamCache(params, paramName) end
 	end
 	function itemFallback:SetParam(name, numOrSerializedNumOrStrOrEmpty)
 		if name == "" then error("Name is empty.", 2) end
@@ -278,7 +283,7 @@ return function(lib)
 	---Returns whether pos is inside the area of the given node.
 	---If the node doesn't have any area, it will behave like a circle/sphere with a radius of `BotNodeMinProximity`.
 	---@param pos GVector
-	---@param verticalLimit number? When set we will check against a volume instead, which is defined by the area extruded ±verticalLimit along the z-axis from the node's origin. When set to nil, this function will perform a "2D only" check.
+	---@param verticalLimit number? When set we will check against a volume instead, which is defined by the area extruded Â±verticalLimit along the z-axis from the node's origin. When set to nil, this function will perform a "2D only" check.
 	---@return boolean
 	function nodeFallback:GetContains(pos, verticalLimit)
 		local z = verticalLimit and math.Clamp(self.Pos.z, pos.z - verticalLimit, pos.z + verticalLimit) or self.Pos.z

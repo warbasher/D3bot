@@ -80,7 +80,7 @@ function HANDLER.ThinkFunction(bot)
 	
 	if mem.nextUpdateSurroundingPlayers and mem.nextUpdateSurroundingPlayers < CurTime() or not mem.nextUpdateSurroundingPlayers then
 		mem.nextUpdateSurroundingPlayers = CurTime() + 0.4 + math.random() * 0.2
-		local enemies = D3bot.From(player.GetAll()):Where(function(k, v) return HANDLER.IsEnemy(bot, v) end).R
+		local enemies = D3bot.From(D3bot.GetCachedPlayerList()):Where(function(k, v) return HANDLER.IsEnemy(bot, v) end).R
 		local closeEnemies = D3bot.From(enemies):Where(function(k, v) return botPos:DistToSqr(v:GetPos()) < 1000*1000 end).R -- TODO: Constant for the distance
 		local closerEnemies = D3bot.From(closeEnemies):Where(function(k, v) return botPos:DistToSqr(v:GetPos()) < 600*600 end).R -- TODO: Constant for the distance
 		local dangerouscloseEnemies = D3bot.From(closerEnemies):Where(function(k, v) return botPos:DistToSqr(v:GetPos()) < 300*300 end).R -- TODO: Constant for the distance
@@ -297,7 +297,7 @@ function HANDLER.CanShootTarget(bot, target)
 	local tr = util.TraceLine({
 		start = origin,
 		endpos = targetPos,
-		filter = player.GetAll(),
+		filter = D3bot.GetCachedPlayerList(),
 		mask = MASK_SHOT_HULL
 	})
 	return not tr.Hit

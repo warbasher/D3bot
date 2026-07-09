@@ -82,7 +82,7 @@ function HANDLER.ThinkFunction(bot)
 	if mem.nextUpdateSurroundingPlayers and mem.nextUpdateSurroundingPlayers < CurTime() or not mem.nextUpdateSurroundingPlayers then
 		if not mem.TgtOrNil or IsValid(mem.TgtOrNil) and mem.TgtOrNil:GetPos():Distance(botPos) > HANDLER.BotTgtFixationDistMin then
 			mem.nextUpdateSurroundingPlayers = CurTime() + 0.9 + math.random() * 0.2
-			local targets = player.GetAll() -- TODO: Filter targets before sorting
+			local targets = table.Copy(D3bot.GetCachedPlayerList()) -- Copied, not shared: sorted in place below, and the cached list is shared across every bot this tick. -- TODO: Filter targets before sorting
 			table.sort(targets, function(a, b) return botPos:DistToSqr(a:GetPos()) < botPos:DistToSqr(b:GetPos()) end)
 			for k, v in ipairs(targets) do
 				if IsValid(v) and botPos:DistToSqr(v:GetPos()) < 500*500 and HANDLER.CanBeTgt(bot, v) and bot:D3bot_CanSeeTarget(nil, v) then
@@ -169,11 +169,11 @@ function HANDLER.RerollTarget(bot)
 	-- Get humans or non zombie players or any players in this order.
 	local players = D3bot.RemoveObsDeadTgts(team.GetPlayers(TEAM_HUMAN))
 	if #players == 0 and TEAM_UNDEAD then
-		players = D3bot.RemoveObsDeadTgts(player.GetAll())
+		players = D3bot.RemoveObsDeadTgts(D3bot.GetCachedPlayerList())
 		players = D3bot.From(players):Where(function(k, v) return v:Team() ~= TEAM_UNDEAD end).R
 	end
 	if #players == 0 then
-		players = D3bot.RemoveObsDeadTgts(player.GetAll())
+		players = D3bot.RemoveObsDeadTgts(D3bot.GetCachedPlayerList())
 	end
 	potEntTargets = D3bot.GetEntsOfClss(potTargetEntClasses)
 	local potTargets = table.Add(players, potEntTargets)
