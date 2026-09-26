@@ -22,8 +22,8 @@ end)
 
 function D3bot.MaintainBotRoles()
 	if GAMEMODE.DebugMode then return end
+	if (#player.GetHumans() == 0) then return end
 
-	if #player.GetHumans() == 0 then return end
 	local desiredCountByTeam = {}
 	local allowedTotal
 	desiredCountByTeam[TEAM_UNDEAD], desiredCountByTeam[TEAM_HUMAN], allowedTotal = D3bot.GetDesiredBotCount()
@@ -54,28 +54,20 @@ function D3bot.MaintainBotRoles()
 	end
 
 	-- TODO: Fix invisible bots when CLASS.OverrideModel is used (most common with Frigid Revenant and other OverrideModel zombies in 2018 ZS if they have a low opacity OverrideModel)
-	
-	-- Sort by frags and being boss zombie
-	--[[if botsByTeam[TEAM_UNDEAD] then
-		table.sort(botsByTeam[TEAM_UNDEAD], function(a, b) return (a:GetZombieClassTable().Boss and 1 or 0) > (b:GetZombieClassTable().Boss and 1 or 0) end)
-	end
-	for team, botByTeam in pairs(botsByTeam) do
-		table.sort(botByTeam, function(a, b) return a:Frags() < b:Frags() end)
-	end]]
-	
+
 	-- Stop managing survivor bots, after round started. Except on ZE or obj maps, where survivors are managed to be 0
-	if GAMEMODE:GetWave() > 0 then
+	if (GAMEMODE:GetWave() > 0) then
 		desiredCountByTeam[TEAM_HUMAN] = nil
 	end
-	
+
 	-- Manage survivor bot count to 0, if they are disabled
-	if not D3bot.SurvivorsEnabled then
+	if (not D3bot.SurvivorsEnabled) then
 		desiredCountByTeam[TEAM_HUMAN] = 0
 	end
-	
+
 	-- Move (kill) survivors to undead if possible
 	if desiredCountByTeam[TEAM_HUMAN] and desiredCountByTeam[TEAM_UNDEAD] then
-		if #(playersByTeam[TEAM_HUMAN] or {}) > desiredCountByTeam[TEAM_HUMAN] and #(playersByTeam[TEAM_UNDEAD] or {}) < desiredCountByTeam[TEAM_UNDEAD] and botsByTeam[TEAM_HUMAN] then
+		if ((#(playersByTeam[TEAM_HUMAN] or {}) > desiredCountByTeam[TEAM_HUMAN])) and (#(playersByTeam[TEAM_UNDEAD] or {}) < desiredCountByTeam[TEAM_UNDEAD]) and botsByTeam[TEAM_HUMAN] then
 			local randomBot = table.remove(botsByTeam[TEAM_HUMAN], 1)
 			randomBot:StripWeapons()
 			--randomBot:KillSilent()
@@ -84,19 +76,10 @@ function D3bot.MaintainBotRoles()
 		end
 	end
 
-	for _, bot in ipairs(bots) do
-		local botTeam = bot:Team()
-		if botTeam ~= TEAM_UNDEAD and botTeam ~= TEAM_HUMAN then
-			SendToDiscordDebugLog(string.format("[D3bot] Watchdog: bot '%s' has no valid managed team (Team()=%s), kicking.", bot:Nick(), tostring(botTeam)))
-			bot:Kick(D3bot.BotKickReason)
-			return
-		end
-	end
-
 	-- Add bots out of managed teams to maintain desired counts
-	if player.GetCount() < allowedTotal then
+	if (player.GetCount() < allowedTotal) then
 		for team, desiredCount in pairs(desiredCountByTeam) do
-			if #(botsByTeam[team] or {}) < desiredCount then
+			if (#(playersByTeam[team] or {}) < desiredCount) then
 				if D3bot.UseConsoleBots then
 					spawnAsTeam = team
 					RunConsoleCommand("bot")
@@ -107,13 +90,14 @@ function D3bot.MaintainBotRoles()
 					local bot = player.CreateNextBot(D3bot.GetUsername())
 					spawnAsTeam = nil
 					if IsValid(bot) then
-						if bot:Team() ~= team then
+						if (bot:Team() ~= team) then
 							bot:SetTeam(team)
 							GAMEMODE:PlayerInitialSpawn(bot)
 						end
 						bot:D3bot_InitializeOrReset()
 					end
 				end
+
 				return
 			end
 		end
@@ -122,7 +106,7 @@ function D3bot.MaintainBotRoles()
 	-- Updated to NOT count player zombies towards the bot total
 	-- Remove bots out of managed teams to maintain desired counts
 	for team, desiredCount in pairs(desiredCountByTeam) do
-		if #(botsByTeam[team] or {}) > desiredCount and botsByTeam[team] then
+		if (#(botsByTeam[team] or {}) > desiredCount) and botsByTeam[team] then
 			local index
 			if (team == TEAM_ZOMBIE) then
 				for i=1, #botsByTeam[team] do
