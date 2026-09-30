@@ -91,22 +91,14 @@ function D3bot.GetTrajectories(initVel, r0, r1, segments)
 	return trajectories
 end
 
--- PERFORMANCE: player.GetAll() allocates and returns a brand new table on every single call --
--- it's not a cached reference to anything. Several bots each independently calling it once or
--- twice per tick (trace filters, target scans, enemy lists) adds up to N-bots x M-call-sites
--- fresh full-roster allocations per tick, most of which don't need to differ from one another
--- within the same tick. D3bot.GetCachedPlayerList() below refreshes once per unique CurTime()
--- (i.e. once per server tick, since CurTime() is stable within a tick) and every caller within
--- that tick shares the same table.
---
--- IMPORTANT: the returned table is shared across every caller in the current tick. Treat it as
--- read-only -- do not sort it, insert into it, or remove from it in place. If you need a
--- modified/filtered copy (e.g. via D3bot.RemoveObsDeadTgts or D3bot.From(...):Where(...)),
+-- Refreshes once per unique CurTime() - i.e. once per server tick, since CurTime() is stable within a tick
+-- Treat this as read-only -- do not sort it, insert into it, or remove from it in place
+-- If you need a modified/filtered copy (e.g. via D3bot.RemoveObsDeadTgts or D3bot.From(...):Where(...)),
 -- that's fine and safe, since those return a new table rather than mutating their input.
 local cachedPlayerList, cachedPlayerListTime = {}, -1
 function D3bot.GetCachedPlayerList()
 	local now = CurTime()
-	if cachedPlayerListTime ~= now then
+	if (cachedPlayerListTime ~= now) then
 		cachedPlayerListTime = now
 		cachedPlayerList = player.GetAll()
 	end
