@@ -65,7 +65,7 @@ function D3bot.MaintainBotRoles()
 	
 	-- Stop managing survivor bots, after round started. Except on ZE or obj maps, where survivors are managed to be 0
 	if GAMEMODE:GetWave() > 0 then
-		desiredCountByTeam[TEAM_HUMAN] = nil
+		desiredCountByTeam[TEAM_HUMAN] = 0
 	end
 	
 	-- Manage survivor bot count to 0, if they are disabled
@@ -75,7 +75,7 @@ function D3bot.MaintainBotRoles()
 	
 	-- Move (kill) survivors to undead if possible
 	if desiredCountByTeam[TEAM_HUMAN] and desiredCountByTeam[TEAM_UNDEAD] then
-		if #(playersByTeam[TEAM_HUMAN] or {}) > desiredCountByTeam[TEAM_HUMAN] and #(playersByTeam[TEAM_UNDEAD] or {}) < desiredCountByTeam[TEAM_UNDEAD] and botsByTeam[TEAM_HUMAN] then
+		if #(botsByTeam[TEAM_HUMAN] or {}) > desiredCountByTeam[TEAM_HUMAN] and #(botsByTeam[TEAM_UNDEAD] or {}) < desiredCountByTeam[TEAM_UNDEAD] and botsByTeam[TEAM_HUMAN] then
 			local randomBot = table.remove(botsByTeam[TEAM_HUMAN], 1)
 			randomBot:StripWeapons()
 			--randomBot:KillSilent()
