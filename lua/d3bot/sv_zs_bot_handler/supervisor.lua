@@ -36,14 +36,6 @@ function D3bot.MaintainBotRoles()
 		table.insert(botsByTeam[team], v)
 	end
 
-	local players = D3bot.GetCachedPlayerList()
-	local playersByTeam = {}
-	for k, v in ipairs(players) do
-		local team = v:Team()
-		playersByTeam[team] = playersByTeam[team] or {}
-		table.insert(playersByTeam[team], v)
-	end
-
 	-- Check if any zombie bot is in barricade ghosting mode.
 	-- This can happen in some gamemodes, we fix that here.
 	-- See https://github.com/Dadido3/D3bot/issues/99 for details.
@@ -79,7 +71,7 @@ function D3bot.MaintainBotRoles()
 	-- Add bots out of managed teams to maintain desired counts
 	if (player.GetCount() < allowedTotal) then
 		for team, desiredCount in pairs(desiredCountByTeam) do
-			if (#(playersByTeam[team] or {}) < desiredCount) then
+			if (#(botsByTeam[team] or {}) < desiredCount) then
 				if D3bot.UseConsoleBots then
 					spawnAsTeam = team
 					RunConsoleCommand("bot")
